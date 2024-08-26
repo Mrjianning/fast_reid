@@ -1,0 +1,1 @@
+python tools/deploy/onnx_export.py --config-file logs/market1501/bagtricks_R50/config.yaml --name baseline_R50 --output outputs/onnx_model --opts MODEL.WEIGHTS logs/market1501/bagtricks_R50/model_final.pth

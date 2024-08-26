@@ -1,0 +1,2 @@
+python demo/demo.py --config-file logs/market1501/bagtricks_R50/config.yaml  --parallel  --input tools/deploy/test_data/*.jpg  \
+     --output pth_output --opts MODEL.WEIGHTS logs/market1501/bagtricks_R50/model_final.pth

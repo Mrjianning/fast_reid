@@ -1,0 +1,79 @@
+MODEL:
+  META_ARCHITECTURE: Baseline  # 使用基准模型架构（Baseline），这是一个标准的、常用于行人重识别的网络架构。
+
+  WEIGHTS:  "checkpoints/market_bot_R50.pth"
+  
+  BACKBONE:
+    NAME: build_resnet_backbone  # 主干网络的构建函数，这里选择了ResNet。
+    NORM: BN  # 使用Batch Normalization (BN) 进行归一化处理，有助于加速训练并稳定训练过程。
+    DEPTH: 50x  # ResNet的深度，这里选择了ResNet-50x，这是一种更深层的ResNet变体，有助于提取更丰富的特征。
+    LAST_STRIDE: 1  # 最后一层的步幅设置为1，这在行人重识别中很常见，因为它有助于保持高分辨率的特征图。
+    FEAT_DIM: 2048  # 最终输出的特征向量维度，ResNet-50的默认输出维度为2048。
+    WITH_IBN: False  # 是否使用Instance-Batch Normalization (IBN)，此处设为False，不使用IBN。
+    PRETRAIN: True  # 是否使用在ImageNet上预训练的模型参数，True表示使用。
+    PRETRAIN_PATH: "checkpoints/market_bot_R50.pth"
+
+  HEADS:
+    NAME: EmbeddingHead  # 网络的头部结构，用于将主干网络输出的特征转换为嵌入特征。
+    NORM: BN  # 在头部结构中也应用Batch Normalization。
+    WITH_BNNECK: True  # 是否在嵌入层前使用BNNeck，这是ReID中常用的策略，有助于特征归一化。
+    POOL_LAYER: GlobalAvgPool  # 使用全局平均池化层，将特征图聚合成一个全局特征。
+    NECK_FEAT: before  # 使用BNNeck之前的特征作为最终的嵌入特征。
+    CLS_LAYER: Linear  # 分类层使用线性层，将特征向量映射到类别概率上。
+
+  LOSSES:
+    NAME: ("CrossEntropyLoss", "TripletLoss",)  # 使用交叉熵损失（用于分类）和三元组损失（用于优化嵌入距离）。
+    
+    CE:
+      EPSILON: 0.1  # 交叉熵损失中的标签平滑参数，增加模型的鲁棒性。
+      SCALE: 1.  # 交叉熵损失的缩放因子。
+
+    TRI:
+      MARGIN: 0.3  # 三元组损失的边界值，用于控制正负样本之间的距离。
+      HARD_MINING: True  # 是否启用困难样本挖掘，有助于提高模型的判别能力。
+      NORM_FEAT: False  # 特征是否归一化，这里不使用归一化。
+      SCALE: 1.  # 三元组损失的缩放因子。
+
+INPUT:
+  SIZE_TRAIN: [ 256, 128 ]  # 训练时输入图像的尺寸，宽度128，高度256。
+  SIZE_TEST: [ 256, 128 ]  # 测试时输入图像的尺寸，保持与训练一致。
+
+  REA:
+    ENABLED: True  # 启用随机擦除（Random Erasing Augmentation），这是一种数据增强技术，有助于防止模型过拟合。
+    PROB: 0.5  # 随机擦除的概率为50%。
+
+  FLIP:
+    ENABLED: True  # 启用水平翻转数据增强，以增加数据的多样性。
+
+  PADDING:
+    ENABLED: True  # 启用图像填充操作，以保持图像的长宽比并减少信息丢失。
+
+DATALOADER:
+  SAMPLER_TRAIN: NaiveIdentitySampler  # 数据加载器的采样方法，这种采样器会确保每个批次中的样本均衡分布在不同的身份ID中。
+  NUM_INSTANCE: 4  # 每个身份ID在一个批次中的实例数量。
+  NUM_WORKERS: 8  # 数据加载的并行线程数，提高数据加载效率。
+
+SOLVER:
+  AMP:
+    ENABLED: True  # 启用自动混合精度训练（Automatic Mixed Precision），以加速训练并减少显存占用。
+  OPT: Adam  # 使用Adam优化器，适合处理稀疏梯度。
+  MAX_EPOCH: 120  # 最大训练轮数，模型将训练120个epoch。
+  BASE_LR: 0.00035  # 初始学习率。
+  WEIGHT_DECAY: 0.0005  # 权重衰减系数，防止过拟合。
+  WEIGHT_DECAY_NORM: 0.0005  # 对归一化层的权重也进行衰减。
+  IMS_PER_BATCH: 64  # 每个批次处理的图像数量。
+
+  SCHED: MultiStepLR  # 学习率调度器，采用多步学习率衰减策略。
+  STEPS: [ 40, 90 ]  # 在第40和90个epoch时，学习率衰减。
+  GAMMA: 0.1  # 学习率每次衰减的倍率。
+
+  WARMUP_FACTOR: 0.1  # 热身阶段的学习率缩放因子，防止初始阶段学习率过高导致不稳定。
+  WARMUP_ITERS: 2000  # 热身阶段的迭代次数。
+
+  CHECKPOINT_PERIOD: 30  # 每隔30个epoch保存一次模型检查点。
+
+TEST:
+  EVAL_PERIOD: 30  # 每隔30个epoch进行一次测试评估。
+  IMS_PER_BATCH: 128  # 测试时每个批次的图像数量。
+
+CUDNN_BENCHMARK: True  # 启用CUDNN的benchmark模式，以加速卷积运算。
